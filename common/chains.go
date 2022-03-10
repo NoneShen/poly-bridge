@@ -32,9 +32,9 @@ var (
 	metisSdk      *chainsdk.EthereumSdkPro
 	bobaSdk       *chainsdk.EthereumSdkPro
 	rinkebySdk    *chainsdk.EthereumSdkPro
-	bytomSdk      *chainsdk.EthereumSdkPro
 	sdkMap        map[uint64]interface{}
 	oasisSdk      *chainsdk.EthereumSdkPro
+	bytomSdk      *chainsdk.EthereumSdkPro
 	config        *conf.Config
 )
 
