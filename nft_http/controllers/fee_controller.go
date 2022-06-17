@@ -45,6 +45,12 @@ func (c *FeeController) GetFee() {
 		c.ServeJSON()
 		return
 	}
+	if token.TokenBasic.Price == 0 {
+		c.Data["json"] = models.MakeErrorRsp(fmt.Sprintf("token: %v price is 0", token.TokenBasic.Name))
+		c.Ctx.ResponseWriter.WriteHeader(400)
+		c.ServeJSON()
+		return
+	}
 	chainFee := new(models.ChainFee)
 	res = db.Where("chain_id = ?", req.DstChainId).Preload("TokenBasic").First(chainFee)
 	if res.RowsAffected == 0 {
