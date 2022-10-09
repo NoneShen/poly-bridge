@@ -332,7 +332,7 @@ func (this *EthereumChainListen) getWrapperEventByBlockNumber1(contractAddr stri
 	wrapperTransactions := make([]*models.WrapperTransaction, 0)
 	lockEvents, err := wrapperContract.FilterPolyWrapperLock(opt, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events :%s", err.Error())
+		return nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err1 :%s", err.Error())
 	}
 	for lockEvents.Next() {
 		evt := lockEvents.Event
@@ -349,7 +349,7 @@ func (this *EthereumChainListen) getWrapperEventByBlockNumber1(contractAddr stri
 	}
 	speedupEvents, err := wrapperContract.FilterPolyWrapperSpeedUp(opt, nil, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events :%s", err.Error())
+		return nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err2 :%s", err.Error())
 	}
 	for speedupEvents.Next() {
 		evt := speedupEvents.Event
@@ -392,7 +392,7 @@ func (this *EthereumChainListen) getECCMEventByBlockNumber(contractAddr string, 
 	crossChainEvents, err := eccmContract.FilterCrossChainEvent(opt, nil)
 	if err != nil {
 		this.ethSdk.SetClientHeightZero(client)
-		return nil, nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events :%s", err.Error())
+		return nil, nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err3 :%s", err.Error())
 	}
 	for crossChainEvents.Next() {
 		evt := crossChainEvents.Event
@@ -506,7 +506,7 @@ func (this *EthereumChainListen) getProxyEventByBlockNumber1(contractAddr string
 	proxyLockEvents := make([]*models.ProxyLockEvent, 0)
 	lockEvents, err := proxyContract.FilterLockEvent(opt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events :%s", err.Error())
+		return nil, nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err4 :%s", err.Error())
 	}
 	for lockEvents.Next() {
 		evt := lockEvents.Event
@@ -702,7 +702,7 @@ func (this *EthereumChainListen) getSwapEventByBlockNumber(contractAddr string, 
 	proxyLockEvents := make([]*models.ProxyLockEvent, 0)
 	lockEvents, err := swapperContract.FilterLockEvent(opt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events :%s", err.Error())
+		return nil, nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err5 :%s", err.Error())
 	}
 	for lockEvents.Next() {
 		evt := lockEvents.Event
