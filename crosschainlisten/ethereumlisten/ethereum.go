@@ -332,7 +332,7 @@ func (this *EthereumChainListen) getWrapperEventByBlockNumber1(contractAddr stri
 	wrapperTransactions := make([]*models.WrapperTransaction, 0)
 	lockEvents, err := wrapperContract.FilterPolyWrapperLock(opt, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err1 :%s", err.Error())
+		return nil, fmt.Errorf("GetSmartContractEventByBlock, filter lock events err1 :%s, contract %v, from %d to %d, ", err.Error(), contractAddr, startHeight, endHeight)
 	}
 	for lockEvents.Next() {
 		evt := lockEvents.Event
