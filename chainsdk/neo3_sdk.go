@@ -18,19 +18,51 @@
 package chainsdk
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/beego/beego/v2/core/logs"
+	"github.com/joeqian10/neo3-gogogo/crypto"
 	"github.com/joeqian10/neo3-gogogo/helper"
 	"github.com/joeqian10/neo3-gogogo/nep17"
 	"github.com/joeqian10/neo3-gogogo/rpc"
 	"github.com/joeqian10/neo3-gogogo/rpc/models"
+	"io/ioutil"
 	"math/big"
+	"net/http"
 	"strconv"
+	"strings"
 )
 
 type Neo3Sdk struct {
 	client *rpc.RpcClient
 	url    string
+}
+
+type Neo3RpcReq struct {
+	JSONRPC string   `json:"jsonrpc"`
+	Method  string   `json:"method"`
+	Params  []string `json:"params"`
+	ID      uint     `json:"id"`
+}
+
+type Nep11Property2 struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Id      int    `json:"id"`
+	Result  struct {
+		Name      string `json:"name"`
+		Image     string `json:"image"`
+		Series    string `json:"series"`
+		Supply    string `json:"supply"`
+		Thumbnail string `json:"thumbnail"`
+	} `json:"result"`
+}
+
+type Nep11Property struct {
+	Name      string `json:"name"`
+	Image     string `json:"image"`
+	Series    string `json:"series"`
+	Supply    string `json:"supply"`
+	Thumbnail string `json:"thumbnail"`
 }
 
 func NewNeo3Sdk(url string) *Neo3Sdk {
@@ -105,6 +137,163 @@ func (sdk *Neo3Sdk) Nep17Info(hash string) (string, string, int64, error) {
 	return hash, symbol, int64(decimal), nil
 }
 
+func Neo3AddrToHash160(addr string) (string, error) {
+	scriptHash, err := crypto.AddressToScriptHash(addr, helper.DefaultAddressVersion)
+	return scriptHash.String(), err
+}
+
+func Hash160ToNeo3Addr(encodedHash string) (string, error) {
+	decodedByte, err := crypto.Base64Decode(encodedHash)
+	if err != nil {
+		return "", err
+	}
+	hash160 := helper.UInt160FromBytes(decodedByte)
+	return crypto.ScriptHashToAddress(hash160, helper.DefaultAddressVersion), nil
+}
+
+func (sdk *Neo3Sdk) Nep11Property() (*Nep11Property, error) {
+	asset := "0x4fb2f93b37ff47c0c5d14cfc52087e3ca338bc56"
+	tokenId := "4d65746150616e616365612023302d3031"
+	params := make([]string, 2)
+	params[0] = asset
+	params[1] = tokenId
+	body, err := jsonRequest(sdk.url, "getnep11properties", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp *Nep11Property
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (sdk *Neo3Sdk) ContractCall1() {
+	hash := "0x4fb2f93b37ff47c0c5d14cfc52087e3ca338bc56"
+	method := "tokensOf"
+	var params []models.RpcContractParameter
+	addr := "Nd6UWMyUDp1nZK7osMXJW9s21NqDNmnBfz"
+	addrHash, _ := Neo3AddrToHash160(addr)
+	params = append(params, models.RpcContractParameter{
+		Type:  "Hash160",
+		Value: addrHash,
+	})
+	res := sdk.client.InvokeFunction(hash, method, params, nil)
+	aaa, _ := json.MarshalIndent(res, "", "	")
+	fmt.Println(string(aaa))
+}
+
+func (sdk *Neo3Sdk) ContractCall2() {
+
+	//hash1 := "vHbGEieTw0YQMJtHu+ELwwRiRVg="
+	//fmt.Println(Hash160ToNeo3Addr(hash1))
+
+	fmt.Println()
+
+	//fmt.Println(Hash160ToNeo3Addr(stack.Value))
+
+	//p, err := stack.ToParameter()
+	//
+	//fmt.Println(string(p.Value.([]byte)))
+	//val, ok := stack.Value.(map[models.InvokeStack]models.InvokeStack)
+	//if ok {
+	//	for k, v := range val {
+	//		res, _ := k.ToParameter()
+	//		ss := res.Value.([]byte)
+	//		fmt.Println(string(ss))
+	//		res2, _ := v.ToParameter()
+	//		ss2 := res2.Value.([]byte)
+	//		fmt.Println(string(ss2))
+	//	}
+	//}
+}
+
+func (sdk *Neo3Sdk) Nep11OwnerOf(assetHash, tokenId string) (string, error) {
+	method := "ownerOf"
+	var params []models.RpcContractParameter
+	tokenIdBase64 := crypto.Base64Encode(helper.HexToBytes(tokenId))
+	params = append(params, models.RpcContractParameter{
+		Type:  "ByteArray",
+		Value: tokenIdBase64,
+	})
+	response := sdk.client.InvokeFunction(assetHash, method, params, nil)
+	stack, err := rpc.PopInvokeStack(response)
+	if err != nil {
+		return "", err
+	}
+	return Hash160ToNeo3Addr(stack.Value.(string))
+}
+func (sdk *Neo3Sdk) Nep11BalanceOf(assetHash, owner string) (*big.Int, error) {
+	method := "balanceOf"
+	ownerHash160, _ := Neo3AddrToHash160(owner)
+	var params []models.RpcContractParameter
+	params = append(params, models.RpcContractParameter{
+		Type:  "Hash160",
+		Value: ownerHash160,
+	})
+	response := sdk.client.InvokeFunction(assetHash, method, params, nil)
+	stack, err := rpc.PopInvokeStack(response)
+	if err != nil {
+		return nil, err
+	}
+	val, _ := stack.ToParameter()
+	return val.Value.(*big.Int), nil
+}
+
+func (sdk *Neo3Sdk) Nep11TokensOf(assetHash, owner string) ([]string, error) {
+	method := "tokensOf"
+	ownerHash160, _ := Neo3AddrToHash160(owner)
+	var params []models.RpcContractParameter
+	params = append(params, models.RpcContractParameter{
+		Type:  "Hash160",
+		Value: ownerHash160,
+	})
+	response := sdk.client.InvokeFunction(assetHash, method, params, nil)
+	stack, err := rpc.PopInvokeStack(response)
+	if err != nil {
+		return nil, err
+	}
+	val, _ := stack.ToParameter()
+	return val.Value.([]string), nil
+}
+
+func (sdk *Neo3Sdk) Nep11Properties(assetHash, tokenId string) (*Nep11Property, error) {
+	method := "properties"
+	var params []models.RpcContractParameter
+	tokenIdBase64 := crypto.Base64Encode(helper.HexToBytes(tokenId))
+	params = append(params, models.RpcContractParameter{
+		Type:  "ByteArray",
+		Value: tokenIdBase64,
+	})
+	response := sdk.client.InvokeFunction(assetHash, method, params, nil)
+	stack, err := rpc.PopInvokeStack(response)
+	if err != nil {
+		return nil, err
+	}
+	property := &Nep11Property{}
+	val, ok := stack.Value.(map[models.InvokeStack]models.InvokeStack)
+	if ok {
+		propertyMap := make(map[string]string)
+		var propertyKey, propertyVal string
+		for k, v := range val {
+			res, _ := k.ToParameter()
+			propertyKey = string(res.Value.([]byte))
+			res2, _ := v.ToParameter()
+			propertyVal = string(res2.Value.([]byte))
+			propertyMap[propertyKey] = propertyVal
+		}
+		arr, _ := json.Marshal(propertyMap)
+		_ = json.Unmarshal(arr, &property)
+	}
+	return property, nil
+}
+
+func (sdk *Neo3Sdk) Nep11TokenUrl(assetHash, tokenId string) (string, error) {
+	property, err := sdk.Nep11Properties(assetHash, tokenId)
+	return property.Image, err
+}
+
 func (sdk *Neo3Sdk) Nep17Balance(hash string, addr string) (*big.Int, error) {
 	scriptHash, err := helper.UInt160FromString(hash)
 	if err != nil {
@@ -131,4 +320,22 @@ func (sdk *Neo3Sdk) Nep17TotalSupply(hash string) (*big.Int, error) {
 		return new(big.Int).SetUint64(0), err
 	}
 	return nep17.TotalSupply()
+}
+
+func jsonRequest(url, method string, params []string) (result []byte, err error) {
+	req := &Neo3RpcReq{
+		JSONRPC: "2.0",
+		Method:  method,
+		Params:  params,
+		ID:      1,
+	}
+	data, _ := json.Marshal(req)
+	resp, err := http.Post(url, "application/json", strings.NewReader(string(data)))
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(resp.Body)
 }

@@ -19,16 +19,15 @@ package controllers
 
 import (
 	"math/big"
-	"poly-bridge/chainsdk"
 	"poly-bridge/models"
 	mcm "poly-bridge/nft_http/meta/common"
+	"poly-bridge/nft_http/nft_sdk"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/beego/beego/v2/server/web"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type ItemController struct {
@@ -50,11 +49,11 @@ func (c *ItemController) Items() {
 
 func (c *ItemController) fetchSingleNFTItem(req *ItemsOfAddressReq) {
 	// check params
-	tokenId, err := checkNumString(req.TokenId)
-	if err != nil {
-		customInput(&c.Controller, ErrCodeRequest, err.Error())
-		return
-	}
+	//tokenId, err := checkNumString(req.TokenId)
+	//if err != nil {
+	//	customInput(&c.Controller, ErrCodeRequest, err.Error())
+	//	return
+	//}
 	sdk, wrapper, _, err := selectNodeAndWrapper(req.ChainId)
 	if err != nil {
 		customInput(&c.Controller, ErrCodeRequest, err.Error())
@@ -66,7 +65,7 @@ func (c *ItemController) fetchSingleNFTItem(req *ItemsOfAddressReq) {
 		return
 	}
 
-	item, err := getSingleItem(sdk, wrapper, token, tokenId, req.Address)
+	item, err := getSingleItem(sdk, wrapper, token, req.TokenId, req.Address)
 	if err != nil {
 		logs.Error("get single item err: %v", err)
 	}
@@ -96,8 +95,8 @@ func (c *ItemController) batchFetchNFTItems(req *ItemsOfAddressReq) {
 	}
 
 	// get user balance and format page attribute
-	asset := common.HexToAddress(token.Hash)
-	owner := common.HexToAddress(req.Address)
+	asset := token.Hash
+	owner := req.Address
 	bigTotalCnt, err := sdk.NFTBalance(asset, owner)
 	if err != nil {
 		customInput(&c.Controller, ErrCodeRequest, err.Error())
@@ -144,15 +143,14 @@ func (c *ItemController) batchFetchNFTItems(req *ItemsOfAddressReq) {
 }
 
 func getSingleItem(
-	sdk *chainsdk.EthereumSdkPro,
-	wrapper common.Address,
+	sdk nft_sdk.INftSdkPro,
+	wrapper string,
 	asset *models.Token,
-	tokenId *big.Int,
+	tokenId string,
 	ownerHash string,
 ) (item *Item, err error) {
-
 	// get and output cache if exist
-	cache, ok := GetItemCache(asset.ChainId, asset.Hash, tokenId.String())
+	cache, ok := GetItemCache(asset.ChainId, asset.Hash, tokenId)
 	if ok {
 		return cache, nil
 	}
@@ -160,23 +158,22 @@ func getSingleItem(
 	// fetch url from wrapper contract
 	// do not need to check user address if ownerHash is empty
 	var url string
-	assetAddr := common.HexToAddress(asset.Hash)
+	assetAddr := asset.Hash
 	if ownerHash == "" {
 		url, err = sdk.GetNFTUrl(assetAddr, tokenId)
 	} else {
-		owner := common.HexToAddress(ownerHash)
-		url, err = sdk.GetAndCheckTokenUrl(wrapper, assetAddr, owner, tokenId)
+		url, err = sdk.GetAndCheckTokenUrl(wrapper, assetAddr, ownerHash, tokenId)
 	}
 	if err != nil {
 		return
 	}
 
 	profile, _ := fetcher.Fetch(asset.ChainId, asset.TokenBasicName, &mcm.FetchRequestParams{
-		TokenId: tokenId.String(),
+		TokenId: tokenId,
 		Url:     url,
 	})
-	item = new(Item).instance(asset.TokenBasicName, tokenId.String(), profile)
-	SetItemCache(asset.ChainId, asset.Hash, tokenId.String(), item)
+	item = new(Item).instance(asset.TokenBasicName, tokenId, profile)
+	SetItemCache(asset.ChainId, asset.Hash, tokenId, item)
 	return
 }
 
@@ -199,7 +196,7 @@ func getItemsWithChainData(name string, asset string, chainId uint64, tokenIdUrl
 		}
 		profileReqs = append(profileReqs, req)
 	}
-	// fetch meta data list and show rpc time
+	// fetch metadata list and show rpc time
 	tBeforeBatchFetch := time.Now().UnixNano()
 	profiles, err := fetcher.BatchFetch(chainId, name, profileReqs)
 	if err != nil {
@@ -217,7 +214,7 @@ func getItemsWithChainData(name string, asset string, chainId uint64, tokenIdUrl
 		SetItemCache(chainId, asset, tokenId, item)
 		delete(tokenIdUrlMap, tokenId)
 	}
-	for tokenId, _ := range tokenIdUrlMap {
+	for tokenId := range tokenIdUrlMap {
 		item := new(Item).instance(name, tokenId, nil)
 		list = append(list, item)
 	}
